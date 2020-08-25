@@ -26,6 +26,14 @@ import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 
 import java.net.URL;
 import java.util.Date;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+
+import org.xmlpull.v1.XmlPullParserException;
+
+import io.minio.MinioClient;
+import io.minio.errors.MinioException;
 
 public class UrlSigner {
 
@@ -53,6 +61,37 @@ public class UrlSigner {
     }
 
     return client.generatePresignedUrl(request);
+  }
+
+
+  public String getPreSignedUrl(long attachmentId, HttpMethod method) throws InvalidKeyException, NoSuchAlgorithmException, IOException, XmlPullParserException, MinioException {
+    String request = geturl(bucket, String.valueOf(attachmentId), method);
+    return request;
+  }
+
+  public String geturl( String bucketname, String attachmentId, HttpMethod method) throws NoSuchAlgorithmException,
+          IOException, InvalidKeyException, XmlPullParserException, MinioException {
+
+    String url = null;
+
+
+    MinioClient minioClient = new MinioClient("http://114.115.142.90:9000", "Q3AM3UQ867SPQQA43P2F", "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG");
+
+    try {
+      if(method==HttpMethod.PUT){
+        url = minioClient.presignedPutObject(bucketname, attachmentId, 60 * 60 * 24);
+      }
+      if(method==HttpMethod.GET){
+        url = minioClient.presignedGetObject(bucketname, attachmentId);
+      }
+      System.out.println(url);
+    } catch(MinioException e) {
+      System.out.println("Error occurred: " + e);
+    } catch (java.security.InvalidKeyException e) {
+      e.printStackTrace();
+    }
+
+    return url;
   }
 
 }

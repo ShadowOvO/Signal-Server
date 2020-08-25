@@ -36,6 +36,10 @@ import java.net.URL;
 import java.util.stream.Stream;
 
 import io.dropwizard.auth.Auth;
+import org.xmlpull.v1.XmlPullParserException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import io.minio.errors.MinioException;
 
 
 @Path("/v1/attachments")
@@ -54,7 +58,7 @@ public class AttachmentControllerV1 extends AttachmentControllerBase {
     this.urlSigner    = new UrlSigner(accessKey, accessSecret, bucket);
   }
 
-  @Timed
+/*  @Timed
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public AttachmentDescriptorV1 allocateAttachment(@Auth Account account)
@@ -80,6 +84,36 @@ public class AttachmentControllerV1 extends AttachmentControllerBase {
       throws IOException
   {
     return new AttachmentUri(urlSigner.getPreSignedUrl(attachmentId, HttpMethod.GET, Stream.of(UNACCELERATED_REGIONS).anyMatch(region -> account.getNumber().startsWith(region))));
+  }*/
+
+  @Timed
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  public AttachmentDescriptorV1 allocateAttachment(@Auth Account account)
+          throws RateLimitExceededException, InvalidKeyException, NoSuchAlgorithmException, IOException, XmlPullParserException, MinioException
+  {
+    if (account.isRateLimited()) {
+      rateLimiters.getAttachmentLimiter().validate(account.getNumber());
+    }
+
+    long attachmentId = generateAttachmentId();
+    String  url          = urlSigner.getPreSignedUrl(attachmentId, HttpMethod.PUT);
+
+    return new AttachmentDescriptorV1(attachmentId, url);
+
+  }
+
+
+
+  @Timed
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/{attachmentId}")
+  public AttachmentUri redirectToAttachment(@Auth                      Account account,
+                                            @PathParam("attachmentId") long    attachmentId)
+          throws IOException, InvalidKeyException, NoSuchAlgorithmException, XmlPullParserException, MinioException
+  {
+    return new AttachmentUri(new URL(urlSigner.getPreSignedUrl(attachmentId, HttpMethod.GET)));
   }
 
 }

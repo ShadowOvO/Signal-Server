@@ -43,6 +43,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.dropwizard.auth.Auth;
+import com.amazonaws.ClientConfiguration;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 
 @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 @Path("/v1/profile")
@@ -58,7 +61,7 @@ public class ProfileController {
   private final AmazonS3            s3client;
   private final String              bucket;
 
-  public ProfileController(RateLimiters rateLimiters,
+/*  public ProfileController(RateLimiters rateLimiters,
                            AccountsManager accountsManager,
                            UsernamesManager usernamesManager,
                            CdnConfiguration profilesConfiguration)
@@ -81,6 +84,38 @@ public class ProfileController {
 
     this.policySigner     = new PolicySigner(profilesConfiguration.getAccessSecret(),
                                              profilesConfiguration.getRegion());
+  }*/
+
+  public ProfileController(RateLimiters rateLimiters,
+                           AccountsManager accountsManager,
+                           UsernamesManager usernamesManager,
+                           CdnConfiguration profilesConfiguration)
+  {
+    AWSCredentials         credentials         = new BasicAWSCredentials(profilesConfiguration.getAccessKey(), profilesConfiguration.getAccessSecret());
+    AWSCredentialsProvider credentialsProvider = new AWSStaticCredentialsProvider(credentials);
+
+    this.rateLimiters       = rateLimiters;
+    this.accountsManager    = accountsManager;
+    this.usernamesManager   = usernamesManager;
+    this.bucket             = profilesConfiguration.getBucket();
+
+    ClientConfiguration clientConfiguration = new ClientConfiguration();
+    clientConfiguration.setSignerOverride("AWSS3V4SignerType");
+
+    this.s3client           = AmazonS3ClientBuilder
+            .standard()
+            .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration("http://114.115.142.90:9000", "us-east-1"))
+            .withPathStyleAccessEnabled(true)
+            .withClientConfiguration(clientConfiguration)
+            .withCredentials(new AWSStaticCredentialsProvider(credentials))
+            .build();
+
+    this.policyGenerator  = new PostPolicyGenerator(profilesConfiguration.getRegion(),
+            profilesConfiguration.getBucket(),
+            profilesConfiguration.getAccessKey());
+
+    this.policySigner     = new PolicySigner(profilesConfiguration.getAccessSecret(),
+            profilesConfiguration.getRegion());
   }
 
   @Timed
@@ -156,7 +191,7 @@ public class ProfileController {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/name/{name}")
-  public void setProfile(@Auth Account account, @PathParam("name") @UnwrapValidatedValue(true) @Length(min = 72,max= 72) Optional<String> name) {
+  public void setProfile(@Auth Account account, @PathParam("name") @UnwrapValidatedValue(true) /*@Length(min = 72,max= 72)*/ Optional<String> name) {
     account.setProfileName(name.orElse(null));
     accountsManager.update(account);
   }
